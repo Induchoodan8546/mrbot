@@ -1,12 +1,13 @@
 from fastapi import FastAPI
 
 from app.api.routes.health import router as health_router
+from app.core.config import settings
 
 
 app = FastAPI(
-    title="MRBot",
+    title=settings.app_name,
     description="Production-oriented local AI chatbot",
-    version="0.1.0",
+    version=settings.app_version,
 )
 
 
@@ -18,4 +19,6 @@ app.include_router(
 
 @app.get("/")
 def root():
-    return {"message": "MRBot API is running"}
+    return {
+        "message": f"{settings.app_name} API is running"
+    }
