@@ -1,5 +1,6 @@
+import pytest
 from datetime import datetime, timezone
-
+from app.domain.exceptions import ConversationNotFoundError
 from app.application.query_manager import QueryManager
 from app.domain.interfaces import (
     ConversationRepository,
@@ -205,3 +206,10 @@ def test_query_manager_rejects_blank_message():
         assert False, "Expected ValueError"
     except ValueError as exc:
         assert str(exc) == "Message cannot be empty."
+def test_query_manager_rejects_unknown_conversation():
+    manager, _, _, _ = create_manager()
+
+    with pytest.raises(ConversationNotFoundError):
+        manager.execute(
+            message="What is a computer?",
+            conversation_id="00000000-0000-4000-8000-000000000001",)

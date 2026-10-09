@@ -1,3 +1,4 @@
+from app.domain.exceptions import ConversationNotFoundError
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -109,8 +110,7 @@ class QueryManager:
             )
 
             if conversation is None:
-                raise ValueError("Conversation not found.")
-
+                raise ConversationNotFoundError(conversation_id)
             return conversation
 
         now = datetime.now(timezone.utc)
