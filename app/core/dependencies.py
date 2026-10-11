@@ -2,9 +2,9 @@ from functools import lru_cache
 
 from app.application.query_manager import QueryManager
 from app.core.config import settings
-from app.infrastructure.database.repositories.in_memory import (
-    InMemoryConversationRepository,
-    InMemoryMessageRepository,
+from app.infrastructure.database.repositories import (
+    SQLAlchemyConversationRepository,
+    SQLAlchemyMessageRepository,
 )
 from app.infrastructure.llm.ollama_provider import OllamaProvider
 
@@ -13,8 +13,8 @@ from app.infrastructure.llm.ollama_provider import OllamaProvider
 def get_query_manager() -> QueryManager:
     llm_provider = OllamaProvider()
 
-    conversation_repository = InMemoryConversationRepository()
-    message_repository = InMemoryMessageRepository()
+    conversation_repository = SQLAlchemyConversationRepository()
+    message_repository = SQLAlchemyMessageRepository()
 
     return QueryManager(
         llm_provider=llm_provider,

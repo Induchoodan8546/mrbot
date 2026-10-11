@@ -1,14 +1,24 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from app.api.routes.chat import router as chat_router
 from app.api.routes.health import router as health_router
 from app.core.config import settings
+from app.infrastructure.database.connection import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
 
 
 app = FastAPI(
     title=settings.app_name,
     description="Production-oriented local AI chatbot",
     version=settings.app_version,
+    lifespan=lifespan,
 )
 
 
