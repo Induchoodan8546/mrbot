@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.api.routes.chat import router as chat_router
 from app.api.routes.health import router as health_router
+from app.api.routes.conversations import router as conversations_router
 from app.core.config import settings
 from app.infrastructure.database.connection import init_db
 
@@ -38,3 +39,7 @@ def root():
     return {
         "message": f"{settings.app_name} API is running"
     }
+app.include_router(
+    conversations_router,
+    prefix="/api/v1",
+)

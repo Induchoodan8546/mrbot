@@ -1,6 +1,8 @@
 from functools import lru_cache
 
+
 from app.application.query_manager import QueryManager
+from app.application.conversation_service import ConversationService
 from app.core.config import settings
 from app.infrastructure.database.repositories import (
     SQLAlchemyConversationRepository,
@@ -22,4 +24,11 @@ def get_query_manager() -> QueryManager:
         message_repository=message_repository,
         default_model=settings.ollama_model,
         system_prompt="You are MRBot, a helpful local AI assistant.",
+    )
+@lru_cache
+def get_conversation_service() -> ConversationService:
+    return ConversationService(
+        conversation_repository=SQLAlchemyConversationRepository(),
+        message_repository=SQLAlchemyMessageRepository(),
+        default_model=settings.ollama_model,
     )
