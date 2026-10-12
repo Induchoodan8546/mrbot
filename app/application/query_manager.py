@@ -14,7 +14,7 @@ from app.domain.models import (
     MessageRole,
     ModelSettings,
 )
-
+MAX_HISTORY_MESSAGES = 20
 
 @dataclass(frozen=True)
 class QueryResult:
@@ -126,13 +126,13 @@ class QueryManager:
 
         return self.conversation_repository.create(conversation)
 
+    
     def _build_context(
         self,
         conversation_id: str,
         history: list[Message],
         user_query: str,
     ) -> list[Message]:
-
         context: list[Message] = []
 
         if self.system_prompt:
@@ -146,8 +146,12 @@ class QueryManager:
                 )
             )
 
-        context.extend(history)
+        # Keep only the most recent historical messages.
+        recent_history = history[-MAX_HISTORY_MESSAGES:]
 
+        context.extend(recent_history)
+
+        # Always include the current user query.
         context.append(
             Message(
                 id=str(uuid4()),
