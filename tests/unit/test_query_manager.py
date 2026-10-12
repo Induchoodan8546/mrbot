@@ -213,3 +213,82 @@ def test_query_manager_rejects_unknown_conversation():
         manager.execute(
             message="What is a computer?",
             conversation_id="00000000-0000-4000-8000-000000000001",)
+
+def test_query_manager_isolates_conversation_history():
+    (
+        manager,
+        llm_provider,
+        conversation_repository,
+        message_repository,
+    ) = create_manager()
+
+    now = datetime.now(timezone.utc)
+
+    # Create two independent conversations.
+    conversation_a = Conversation(
+        id="conversation-A",
+        user_id=None,
+        title="Conversation A",
+        model="llama3.2",
+        created_at=now,
+        updated_at=now,
+    )
+
+    conversation_b = Conversation(
+        id="conversation-B",
+        user_id=None,
+        title="Conversation B",
+        model="llama3.2",
+        created_at=now,
+        updated_at=now,
+    )
+
+    conversation_repository.create(conversation_a)
+    conversation_repository.create(conversation_b)
+
+    # Add a unique message to Conversation A.
+    message_repository.add(
+        Message(
+            id="message-A",
+            conversation_id="conversation-A",
+            role=MessageRole.USER,
+            content="My secret test word is BLUEBIRD.",
+            created_at=now,
+        )
+    )
+
+    # Add separate history to Conversation B.
+    message_repository.add(
+        Message(
+            id="message-B",
+            conversation_id="conversation-B",
+            role=MessageRole.USER,
+            content="I am learning about computers.",
+            created_at=now,
+        )
+    )
+
+    # Execute a query only in Conversation B.
+    result = manager.execute(
+        message="What topic am I learning about?",
+        conversation_id="conversation-B",
+    )
+
+    # Confirm the request stayed in Conversation B.
+    assert result.conversation_id == "conversation-B"
+
+    received_contents = [
+        message.content
+        for message in llm_provider.received_messages
+    ]
+
+    # Conversation B's context includes its own history and query.
+    assert "I am learning about computers." in received_contents
+    assert "What topic am I learning about?" in received_contents
+
+    # Conversation A's private test message must not leak.
+    assert "My secret test word is BLUEBIRD." not in received_contents
+
+    # System prompt remains in the context.
+    assert "You are MRBot." in received_contents
+
