@@ -320,3 +320,45 @@ def test_query_manager_streams_and_persists_response():
     assert message_repository.messages[1].content == "This is a test response."
 
     assert llm_provider.received_messages
+
+def test_query_manager_does_not_persist_failed_stream():
+    (
+        manager,
+        llm_provider,
+        _,
+        message_repository,
+    ) = create_manager()
+
+    def failing_stream(messages, settings):
+        yield "Partial answer"
+        raise RuntimeError("Simulated Ollama failure")
+
+    llm_provider.stream = failing_stream
+
+    with pytest.raises(RuntimeError, match="Simulated Ollama failure"):
+        list(manager.execute_stream(message="Test failure"))
+
+    assert message_repository.messages == []
+
+
+def test_query_manager_does_not_persist_closed_stream():
+    (
+        manager,
+        llm_provider,
+        _,
+        message_repository,
+    ) = create_manager()
+
+    def long_stream(messages, settings):
+        yield "First chunk"
+        yield "Second chunk"
+
+    llm_provider.stream = long_stream
+
+    stream = manager.execute_stream(message="Test disconnect")
+
+    assert next(stream) == "First chunk"
+
+    stream.close()
+
+    assert message_repository.messages == []

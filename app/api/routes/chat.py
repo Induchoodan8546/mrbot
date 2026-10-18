@@ -85,11 +85,14 @@ def chat_stream(
 
             yield "event: done\ndata: {}\n\n"
 
-        except Exception:
-            # Log the exception in production; don't expose internal details.
+        except Exception as exc:
+            import logging
+
+            logging.exception("MRBot streaming response failed")
+
             yield (
                 "event: error\n"
-                'data: {"message": "Response generation failed."}\n\n'
+                + f"data: {json.dumps({'message': str(exc)})}\n\n"
             )
 
     return StreamingResponse(
