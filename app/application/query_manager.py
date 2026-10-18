@@ -1,8 +1,10 @@
-from app.domain.exceptions import ConversationNotFoundError
+
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from app.domain.exceptions import ConversationNotFoundError
 from app.domain.interfaces import (
     ConversationRepository,
     LLMProvider,
@@ -14,7 +16,9 @@ from app.domain.models import (
     MessageRole,
     ModelSettings,
 )
+
 MAX_HISTORY_MESSAGES = 20
+
 
 @dataclass(frozen=True)
 class QueryResult:
@@ -45,7 +49,6 @@ class QueryManager:
         model: str | None = None,
         temperature: float = 0.7,
     ) -> QueryResult:
-
         query = self._normalize_query(message)
 
         conversation = self._resolve_conversation(
@@ -89,6 +92,57 @@ class QueryManager:
             model=selected_model,
         )
 
+    def execute_stream(
+        self,
+        message: str,
+        conversation_id: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.7,
+    ) -> Iterator[str]:
+        query = self._normalize_query(message)
+
+        conversation = self._resolve_conversation(
+            conversation_id=conversation_id,
+            requested_model=model,
+        )
+
+        selected_model = model or conversation.model
+
+        history = self.message_repository.get_by_conversation_id(
+            conversation.id
+        )
+
+        context = self._build_context(
+            conversation_id=conversation.id,
+            history=history,
+            user_query=query,
+        )
+
+        model_settings = ModelSettings(
+            model=selected_model,
+            temperature=temperature,
+        )
+
+        full_response: list[str] = []
+
+        try:
+            for chunk in self.llm_provider.stream(
+                messages=context,
+                settings=model_settings,
+            ):
+                if chunk:
+                    full_response.append(chunk)
+                    yield chunk
+        finally:
+            response_text = "".join(full_response).strip()
+
+            if response_text:
+                self._persist_messages(
+                    conversation_id=conversation.id,
+                    user_query=query,
+                    assistant_response=response_text,
+                )
+
     @staticmethod
     def _normalize_query(message: str) -> str:
         query = message.strip()
@@ -103,7 +157,6 @@ class QueryManager:
         conversation_id: str | None,
         requested_model: str | None,
     ) -> Conversation:
-
         if conversation_id is not None:
             conversation = self.conversation_repository.get_by_id(
                 conversation_id
@@ -111,6 +164,7 @@ class QueryManager:
 
             if conversation is None:
                 raise ConversationNotFoundError(conversation_id)
+
             return conversation
 
         now = datetime.now(timezone.utc)
@@ -126,7 +180,6 @@ class QueryManager:
 
         return self.conversation_repository.create(conversation)
 
-    
     def _build_context(
         self,
         conversation_id: str,
@@ -146,12 +199,9 @@ class QueryManager:
                 )
             )
 
-        # Keep only the most recent historical messages.
         recent_history = history[-MAX_HISTORY_MESSAGES:]
-
         context.extend(recent_history)
 
-        # Always include the current user query.
         context.append(
             Message(
                 id=str(uuid4()),
@@ -174,7 +224,6 @@ class QueryManager:
         user_query: str,
         assistant_response: str,
     ) -> None:
-
         now = datetime.now(timezone.utc)
 
         user_message = Message(

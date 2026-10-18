@@ -31,11 +31,15 @@ class FakeLLMProvider(LLMProvider):
         return "This is a test response."
 
     def stream(
-        self,
-        messages: list[Message],
-        settings: ModelSettings,
-    ):
-        yield "This is a test response."
+    self,
+    messages: list[Message],
+    settings: ModelSettings,
+):
+        self.received_messages = messages
+        self.received_settings = settings
+
+        yield "This is a test "
+        yield "response."
 
 
 class FakeConversationRepository(ConversationRepository):
@@ -292,3 +296,27 @@ def test_query_manager_isolates_conversation_history():
     # System prompt remains in the context.
     assert "You are MRBot." in received_contents
 
+
+def test_query_manager_streams_and_persists_response():
+    (
+        manager,
+        llm_provider,
+        conversation_repository,
+        message_repository,
+    ) = create_manager()
+
+    chunks = list(
+        manager.execute_stream(
+            message="What is a computer?",
+        )
+    )
+
+    assert chunks == ["This is a test ", "response."]
+
+    assert len(message_repository.messages) == 2
+    assert message_repository.messages[0].role == MessageRole.USER
+    assert message_repository.messages[0].content == "What is a computer?"
+    assert message_repository.messages[1].role == MessageRole.ASSISTANT
+    assert message_repository.messages[1].content == "This is a test response."
+
+    assert llm_provider.received_messages
