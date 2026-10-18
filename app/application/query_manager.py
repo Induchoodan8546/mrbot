@@ -92,6 +92,7 @@ class QueryManager:
             model=selected_model,
         )
 
+    
     def execute_stream(
         self,
         message: str,
@@ -124,6 +125,7 @@ class QueryManager:
         )
 
         full_response: list[str] = []
+        completed = False
 
         try:
             for chunk in self.llm_provider.stream(
@@ -133,15 +135,22 @@ class QueryManager:
                 if chunk:
                     full_response.append(chunk)
                     yield chunk
+
+            # Reached only when the provider finishes normally.
+            completed = True
+
         finally:
             response_text = "".join(full_response).strip()
 
-            if response_text:
+            # Persist only a completed, non-empty response.
+            # Errors and early generator closure won't save partial text.
+            if completed and response_text:
                 self._persist_messages(
                     conversation_id=conversation.id,
                     user_query=query,
                     assistant_response=response_text,
                 )
+
 
     @staticmethod
     def _normalize_query(message: str) -> str:
