@@ -97,7 +97,7 @@ def test_stream_failure_returns_safe_sse_error():
             )
 
         assert response.status_code == 200
--        assert response.headers["content-type"].startswith(
+        assert response.headers["content-type"].startswith(
             "text/event-stream"
         )
         assert "event: error" in response.text
