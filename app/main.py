@@ -1,11 +1,19 @@
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-
+from fastapi.exceptions import RequestValidationError
+#from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 from app.api.routes.chat import router as chat_router
 from app.api.routes.health import router as health_router
 from app.api.routes.conversations import router as conversations_router
 from app.core.config import settings
+from app.core.exception_handlers import (
+    unexpected_exception_handler,
+    validation_exception_handler,
+)
 from app.infrastructure.database.connection import init_db
 
 
@@ -23,15 +31,20 @@ app = FastAPI(
 )
 
 
-app.include_router(
-    health_router,
-    prefix="/api/v1",
+app.add_exception_handler(
+    RequestValidationError,
+    validation_exception_handler,
 )
 
-app.include_router(
-    chat_router,
-    prefix="/api/v1",
+app.add_exception_handler(
+    Exception,
+    unexpected_exception_handler,
 )
+
+
+app.include_router(health_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
+app.include_router(conversations_router, prefix="/api/v1")
 
 
 @app.get("/")
@@ -39,7 +52,3 @@ def root():
     return {
         "message": f"{settings.app_name} API is running"
     }
-app.include_router(
-    conversations_router,
-    prefix="/api/v1",
-)

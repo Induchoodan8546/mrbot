@@ -1,7 +1,8 @@
 
+#from app.core.exception_handlers import logger
 import json
 from collections.abc import Iterator
-
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
@@ -12,6 +13,7 @@ from app.domain.exceptions import ConversationNotFoundError
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -85,15 +87,18 @@ def chat_stream(
 
             yield "event: done\ndata: {}\n\n"
 
-        except Exception as exc:
-            import logging
-
-            logging.exception("MRBot streaming response failed")
+        except Exception:
+            logger.exception("MRBot streaming response failed")
 
             yield (
-                "event: error\n"
-                + f"data: {json.dumps({'message': str(exc)})}\n\n"
-            )
+            "event: error\n"
+            + "data: "
+            + json.dumps({
+                "error": "stream_generation_failed",
+                "message": "Unable to generate a response. Please try again.",
+            })
+            + "\n\n"
+        )
 
     return StreamingResponse(
         generate_events(),
