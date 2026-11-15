@@ -12,30 +12,116 @@ import {
   User,
   ChevronDown,
 } from 'lucide-react'
+import { streamChat } from './services/chatservice'
+
+type ChatMessage = {
+  role: 'user' | 'assistant'
+  content: string
+}
 
 function App() {
   const [message, setMessage] = useState('')
-  const [messages, setMessages] = useState<
-    { role: 'user' | 'assistant'; content: string }[]
-  >([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  function sendMessage() {
-    if (!message.trim()) return
+  async function sendMessage() {
+    const userMessage = message.trim()
 
-    setMessages((previous) => [
-      ...previous,
-      { role: 'user', content: message.trim() },
-    ])
+    if (!userMessage || isGenerating) return
 
     setMessage('')
+    setError(null)
+    setIsGenerating(true)
+
+    setMessages(previous => [
+      ...previous,
+      { role: 'user', content: userMessage },
+      { role: 'assistant', content: '' },
+    ])
+
+    try {
+      let activeConversationId = conversationId
+
+      // Create a conversation for the first message.
+      if (!activeConversationId) {
+        const response = await fetch('/api/v1/conversations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Could not create conversation (${response.status})`)
+        }
+
+        const conversation: { id: string } = await response.json()
+        activeConversationId = conversation.id
+        setConversationId(activeConversationId)
+      }
+
+      await streamChat(activeConversationId, userMessage, {
+        onToken: (token) => {
+          setMessages(previous => {
+            const updated = [...previous]
+            const lastMessage = updated[updated.length - 1]
+
+            if (lastMessage?.role === 'assistant') {
+              updated[updated.length - 1] = {
+                ...lastMessage,
+                content: lastMessage.content + token,
+              }
+            }
+
+            return updated
+          })
+        },
+
+        onDone: () => {
+          // Streaming completed successfully.
+        },
+
+        onError: (message) => {
+          setError(message || 'The AI could not generate a response.')
+        },
+      })
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Something went wrong.'
+
+      setError(errorMessage)
+
+      setMessages(previous => {
+        const updated = [...previous]
+        const lastMessage = updated[updated.length - 1]
+
+        if (lastMessage?.role === 'assistant' && !lastMessage.content) {
+          updated.pop()
+        }
+
+        return updated
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  function startNewChat() {
+    if (isGenerating) return
+
+    setMessages([])
+    setConversationId(null)
+    setMessage('')
+    setError(null)
   }
 
   return (
     <div className="app-container">
-
-      {/* Sidebar */}
-    <aside className={`sidebar ${sidebarOpen ? '' : 'sidebar-hidden'}`}>
+      <aside className={`sidebar ${sidebarOpen ? '' : 'sidebar-hidden'}`}>
         <div className="sidebar-header">
           <div className="brand">
             <div className="brand-icon">
@@ -55,7 +141,8 @@ function App() {
 
         <button
           className="new-chat-button"
-          onClick={() => setMessages([])}
+          onClick={startNewChat}
+          disabled={isGenerating}
         >
           <Plus size={18} />
           <span>New chat</span>
@@ -72,7 +159,6 @@ function App() {
 
         <div className="sidebar-section history-section">
           <p className="section-label">RECENT CONVERSATIONS</p>
-
           <p className="empty-history">Your conversations will appear here.</p>
         </div>
 
@@ -92,9 +178,7 @@ function App() {
         </div>
       </aside>
 
-      {/* Main workspace */}
       <main className="main-content">
-
         <header className="topbar">
           <div className="topbar-left">
             {!sidebarOpen && (
@@ -168,7 +252,13 @@ function App() {
                     <span className="message-author">
                       {item.role === 'assistant' ? 'MRBot' : 'You'}
                     </span>
-                    <p>{item.content}</p>
+
+                    <p>
+                      {item.content ||
+                        (item.role === 'assistant' && isGenerating
+                          ? 'Thinking...'
+                          : '')}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -176,20 +266,27 @@ function App() {
           )}
         </section>
 
+        {error && (
+          <div className="error-message" role="alert">
+            {error}
+          </div>
+        )}
+
         <footer className="composer-area">
           <div className="composer">
-            <button className="composer-icon" title="Attach file">
+            <button className="composer-icon" title="Attach file" disabled>
               <Paperclip size={19} />
             </button>
 
             <textarea
               placeholder="Message MRBot..."
               value={message}
+              disabled={isGenerating}
               onChange={(event) => setMessage(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault()
-                  sendMessage()
+                  void sendMessage()
                 }
               }}
               rows={1}
@@ -197,8 +294,8 @@ function App() {
 
             <button
               className="send-button"
-              onClick={sendMessage}
-              disabled={!message.trim()}
+              onClick={() => void sendMessage()}
+              disabled={!message.trim() || isGenerating}
               title="Send message"
             >
               <Send size={18} />
@@ -209,7 +306,6 @@ function App() {
             MRBot can make mistakes. Verify important information.
           </p>
         </footer>
-
       </main>
     </div>
   )
