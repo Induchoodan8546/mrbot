@@ -29,7 +29,13 @@ class OllamaProvider(LLMProvider):
         response = self.client.chat(
             model=settings.model,
             messages=self._convert_messages(messages),
-            options={"temperature": settings.temperature},
+            options={
+    "temperature": settings.temperature,
+    "top_p": settings.top_p,
+    "top_k": settings.top_k,
+    "repeat_penalty": settings.repeat_penalty,
+    "num_predict": settings.num_predict,
+},
             stream=False,
         )
         return response.message.content
@@ -42,7 +48,13 @@ class OllamaProvider(LLMProvider):
         response = self.client.chat(
             model=settings.model,
             messages=self._convert_messages(messages),
-            options={"temperature": settings.temperature},
+            options={
+    "temperature": settings.temperature,
+    "top_p": settings.top_p,
+    "top_k": settings.top_k,
+    "repeat_penalty": settings.repeat_penalty,
+    "num_predict": settings.num_predict,
+},
             stream=True,
         )
 

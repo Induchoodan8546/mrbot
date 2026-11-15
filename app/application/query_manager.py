@@ -69,10 +69,9 @@ class QueryManager:
         )
 
         model_settings = ModelSettings(
-            model=selected_model,
-            temperature=temperature,
-        )
-
+    model=selected_model,
+    temperature=temperature,
+)
         response = self.llm_provider.generate(
             messages=context,
             settings=model_settings,
